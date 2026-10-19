@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WardenDeck</title>
+<style>
+:root{--bg:#0e1116;--panel:#161b22;--line:#2a3038;--text:#e6edf3;--muted:#8b949e;--accent:#3fb950;--danger:#f85149;--link:#58a6ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+.hidden{display:none!important}
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);background:#0d1117}
+header h1{font-size:17px;margin:0}
+header .meta{color:var(--muted);font-size:12px;flex:1}
+nav{display:flex;gap:8px;padding:12px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+nav button{background:transparent;color:var(--muted);border:1px solid transparent;padding:6px 12px;border-radius:8px;cursor:pointer}
+nav button.active{color:var(--text);background:var(--panel);border-color:var(--line)}
+main{padding:20px 22px;max-width:1180px;margin:0 auto}
+section{display:none}
+section.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat b{display:block;font-size:26px}
+.stat span{color:var(--muted);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:500}
+input,select,textarea{background:#0d1117;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-width:0}
+button.primary{background:#238636;border:1px solid #2ea043;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer}
+button.mini{background:#21262d;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
+button.danger{color:var(--danger)}
+form.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+form.row input,form.row select{flex:0 1 auto}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12px;white-space:pre-wrap}
+.err{color:var(--danger);font-size:12px}
+.ok{color:var(--accent)}
+.bad{color:var(--danger)}
+.muted{color:var(--muted)}
+a{color:var(--link);word-break:break-all}
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:10}
+.login-card{width:340px}
+.login-card h1{margin:0 0 6px;font-size:20px}
+.login-card input{width:100%;margin:10px 0}
+.login-card button{width:100%}
+.stack{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+
+<div id="login" class="hidden">
+  <div class="card login-card">
+    <h1>WardenDeck</h1>
+    <div class="muted">输入 <code>wardendeck init</code> 打印的 setup token</div>
+    <input id="token" type="password" placeholder="setup token" autocomplete="off">
+    <button class="primary" onclick="doLogin()">进入</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>WardenDeck</h1>
+    <div class="meta" id="meta"></div>
+    <button class="mini" onclick="logout()">退出</button>
+  </header>
+  <nav>
+    <button data-tab="overview" class="active" onclick="tab('overview')">概览</button>
+    <button data-tab="projects" onclick="tab('projects')">项目</button>
+    <button data-tab="assistants" onclick="tab('assistants')">机器人</button>
+    <button data-tab="models" onclick="tab('models')">模型</button>
+    <button data-tab="access" onclick="tab('access')">成员与接入</button>
+    <button data-tab="bindings" onclick="tab('bindings')">平台绑定</button>
+    <button data-tab="audit" onclick="tab('audit')">审计</button>
+  </nav>
+
+  <main>
+    <section id="overview" class="active">
+      <div class="grid" id="stats"></div>
+      <div class="card">
+        <h2>Doctor</h2>
+        <div id="doctor" class="muted">检查中…</div>
+      </div>
+      <div class="card">
+        <h2>模拟一条消息</h2>
+        <form class="row" onsubmit="sendMock(event)">
+          <select id="mockProject"></select>
+          <input id="mockUser" placeholder="用户邮箱" style="width:200px">
+          <input id="mockText" placeholder="消息内容" style="width:320px">
+          <button class="primary">发送</button>
+        </form>
+        <pre id="mockOut" class="muted">原型未接入真实 agent，仅写入审计。</pre>
+      </div>
+    </section>
+
+    <section id="projects">
+      <div class="card">
+        <h2>新建项目</h2>
+        <form class="row" onsubmit="createProject(event)">
+          <input id="pName" placeholder="项目名，如 backend">
+          <input id="pWorkdir" placeholder="/path/to/repo 或 ~/repo" style="width:300px">
+          <select id="pAgent"><option value="claudecode">claudecode</option><option value="codex">codex</option></select>
+          <select id="pPerm">
+            <option value="default">default（逐项确认）</option>
+            <option value="acceptEdits">acceptEdits（自动允许编辑）</option>
+            <option value="bypassPermissions">bypassPermissions（全部允许，危险）</option>
+            <option value="plan">plan（只读规划）</option>
+          </select>
+          <button class="primary">创建</button>
+        </form>
+        <table><thead><tr><th>项目</th><th>Agent</th><th>工作目录</th><th>模型</th><th>权限模式</th></tr></thead><tbody id="projectRows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="assistants">
+      <div class="card">
+        <h2>机器人（记忆归属）</h2>
+        <div class="muted" style="margin-bottom:10px">记忆按机器人隔离；同一个机器人下切换 Claude Code / Codex 共享同一份长期记忆。Agent 的原生 transcript 不外借，切换时以记忆和摘要延续。</div>
+        <form class="row" onsubmit="createAssistant(event)">
+          <input id="aName" placeholder="机器人名，如 backend-bot">
+          <select id="aAgent"><option value="claudecode">claudecode</option><option value="codex">codex</option></select>
+          <button class="primary">创建</button>
+        </form>
+        <table><thead><tr><th>机器人</th><th>默认 Agent</th><th>记忆条数</th><th>创建时间</th></tr></thead><tbody id="assistantRows"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>长期记忆</h2>
+        <form class="row" onsubmit="createMemory(event)">
+          <select id="memAssistant" onchange="loadMemories()"></select>
+          <select id="memScope">
+            <option value="assistant">机器人（全局）</option>
+            <option value="project">项目</option>
+            <option value="chat">会话 / 群</option>
+            <option value="user">用户</option>
+          </select>
+          <input id="memScopeId" placeholder="作用域 ID（项目名 / chat / 用户）" style="width:240px">
+          <input id="memKind" placeholder="kind" value="fact" style="width:90px">
+          <input id="memText" placeholder="要记住的内容" style="width:300px">
+          <button class="primary">写入</button>
+        </form>
+        <table><thead><tr><th>#</th><th>作用域</th><th>类型</th><th>内容</th><th>操作</th></tr></thead><tbody id="memoryRows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="models">
+      <div class="card">
+        <h2>模型目录（可选）</h2>
+        <div class="muted" style="margin-bottom:10px">Claude Code / Codex 的模型由它们自己的配置决定，这里不需要填；仅用于将来覆盖模型或接入 API 供应商。</div>
+        <form class="row" onsubmit="createModel(event)">
+          <input id="mId" placeholder="model id，如 claude-sonnet-5-5">
+          <input id="mName" placeholder="显示名">
+          <input id="mProvider" placeholder="provider，如 anthropic">
+          <button class="primary">添加</button>
+        </form>
+        <table><thead><tr><th>ID</th><th>显示名</th><th>Provider</th><th>状态</th></tr></thead><tbody id="modelRows"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>项目默认模型（管理员切换）</h2>
+        <table><thead><tr><th>项目</th><th>当前模型</th><th>切换</th></tr></thead><tbody id="modelDefaults"></tbody></table>
+      </div>
+    </section>
+
+    <section id="access">
+      <div class="card">
+        <h2>添加成员</h2>
+        <form class="row" onsubmit="addUser(event)">
+          <input id="uEmail" placeholder="alice@example.com">
+          <select id="uRole"><option>viewer</option><option>operator</option><option>admin</option><option>owner</option></select>
+          <button class="primary">添加</button>
+        </form>
+        <table><thead><tr><th>邮箱</th><th>角色</th><th>状态</th><th>修改</th></tr></thead><tbody id="userRows"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>绑定平台身份</h2>
+        <form class="row" onsubmit="mapUser(event)">
+          <select id="iPlatform"><option>slack</option><option>telegram</option><option>feishu</option></select>
+          <input id="iExternal" placeholder="Slack U0123 / TG 123456 / Feishu ou_...">
+          <input id="iEmail" placeholder="本地用户邮箱">
+          <button class="primary">绑定</button>
+        </form>
+        <table><thead><tr><th>平台</th><th>外部 ID</th><th>用户</th></tr></thead><tbody id="identityRows"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>项目授权</h2>
+        <form class="row" onsubmit="grant(event)">
+          <select id="gProject"></select>
+          <input id="gEmail" placeholder="用户邮箱">
+          <select id="gRole"><option>operator</option><option>viewer</option><option>admin</option></select>
+          <button class="primary">授权</button>
+        </form>
+        <table><thead><tr><th>项目</th><th>用户</th><th>角色</th></tr></thead><tbody id="grantRows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="bindings">
+      <div class="card">
+        <h2>新增绑定</h2>
+        <form class="row" onsubmit="createBinding(event)">
+          <select id="bAssistant" title="记忆归属"></select>
+          <select id="bProject"></select>
+          <select id="bPlatform" onchange="toggleTokenFields()"><option value="slack">slack</option><option value="telegram">telegram</option><option value="feishu">feishu</option></select>
+          <input id="bChannel" placeholder="Slack C... / TG chat / Feishu oc_ 或 ou_" style="width:250px">
+          <input id="bAllow" placeholder="允许的用户 ID，逗号分隔" style="width:220px">
+          <label class="muted"><input type="checkbox" id="bMention" checked> 需要 @</label>
+          <div id="slackTokens" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="bApp" placeholder="xapp-...">
+            <input id="bBot" placeholder="xoxb-...">
+          </div>
+          <input id="bToken" placeholder="Telegram bot token" class="hidden">
+          <div id="feishuTokens" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="bAppId" placeholder="飞书 app_id (cli_...)">
+            <input id="bAppSecret" placeholder="飞书 app_secret">
+            <select id="bDomain"><option value="feishu">飞书</option><option value="lark">Lark</option></select>
+          </div>
+          <button class="primary">绑定</button>
+        </form>
+        <div class="row" style="margin-top:8px">
+          <button class="mini" onclick="feishuSetup()">扫码新建飞书应用</button>
+          <span id="feishuSetupMsg" class="muted"></span>
+        </div>
+        <div id="feishuSetupBox" class="hidden" style="margin-bottom:8px">
+          <a id="feishuSetupLink" target="_blank" rel="noreferrer"></a>
+        </div>
+        <div class="muted">凭证保存在服务端（原型为明文，数据目录 0600）；空 allowed_users 会被拒绝。</div>
+      </div>
+      <div class="card">
+        <h2>已绑定</h2>
+        <table><thead><tr><th>ID</th><th>平台</th><th>机器人</th><th>项目</th><th>Channel/Chat</th><th>允许</th><th>操作</th></tr></thead><tbody id="bindingRows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="audit">
+      <div class="card">
+        <h2>审计日志 <button class="mini" onclick="verifyAudit()">校验哈希链</button></h2>
+        <div id="auditStatus" class="muted"></div>
+        <table><thead><tr><th>#</th><th>时间</th><th>动作</th><th>对象</th><th>结果</th></tr></thead><tbody id="auditRows"></tbody></table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+let S = null;
+let AGENTS = [];
+const PERM_MODES = [
+  { value: 'default', label: 'default' },
+  { value: 'acceptEdits', label: 'acceptEdits' },
+  { value: 'bypassPermissions', label: 'bypassPermissions' },
+  { value: 'plan', label: 'plan' },
+  { value: 'dontAsk', label: 'dontAsk' },
+  { value: 'auto', label: 'auto' },
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, opts = {}) {
+  const res = await fetch('/api/v1' + path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+function showLogin() {
+  $('login').classList.remove('hidden');
+  $('app').classList.add('hidden');
+}
+
+function showApp() {
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+}
+
+async function doLogin() {
+  $('loginErr').textContent = '';
+  try {
+    const res = await fetch('/api/v1/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: $('token').value }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '登录失败');
+    showApp();
+    await boot();
+  } catch (e) {
+    $('loginErr').textContent = e.message;
+  }
+}
+
+async function logout() {
+  await fetch('/api/v1/logout', { method: 'POST' });
+  location.reload();
+}
+
+async function boot() {
+  try {
+    const [data, agentData] = await Promise.all([api('/state'), api('/agents')]);
+    S = data.state;
+    AGENTS = agentData.agents || [];
+    showApp();
+    render(data);
+  } catch (e) {
+    if (e.message !== 'unauthorized') $('loginErr').textContent = e.message;
+  }
+}
+
+function render(data) {
+  $('meta').textContent = `v${data.version} · uptime ${data.uptime}s · ${data.config.admin_email}`;
+  const c = S.counts || {};
+  $('stats').innerHTML = [['机器人', c.assistants], ['项目', c.projects], ['成员', c.users], ['绑定', c.bindings], ['记忆', c.memories], ['审计事件', c.audit]]
+    .map(([k, v]) => `<div class="stat"><b>${v || 0}</b><span>${k}</span></div>`).join('');
+  renderProjects();
+  renderAssistants();
+  renderModels();
+  renderAccess();
+  renderBindings();
+  loadDoctor();
+  loadAudit();
+}
+
+function options(items, valueKey, labelKey, selected) {
+  return items.map(x => {
+    const v = typeof x === 'string' ? x : x[valueKey];
+    const label = typeof x === 'string' ? x : x[labelKey];
+    return `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+function renderProjects() {
+  $('projectRows').innerHTML = S.projects.length ? S.projects.map((p, i) => `
+    <tr><td>${esc(p.name)}</td><td>${esc(p.agent)}</td><td class="muted">${esc(p.workdir)}</td>
+    <td>${esc(p.default_model || '由 agent CLI 管理')}</td>
+    <td><select id="pp-${i}">${options(PERM_MODES, 'value', 'label', p.permission_mode || 'default')}</select>
+    <button class="mini" onclick="changePermission(${i})">保存</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="muted">还没有项目</td></tr>';
+  $('pAgent').innerHTML = AGENTS.length
+    ? AGENTS.map(a => `<option value="${esc(a.name)}" ${a.name === 'claudecode' ? 'selected' : ''}>${esc(a.name)} · ${esc(a.version)}</option>`).join('')
+    : '<option value="claudecode">claudecode（未检测到）</option>';
+  $('mockProject').innerHTML = options(S.projects, 'name', 'name', '');
+  $('gProject').innerHTML = options(S.projects, 'name', 'name', '');
+  $('bProject').innerHTML = options(S.projects, 'name', 'name', '');
+  $('bAssistant').innerHTML = options(S.assistants || [], 'name', 'name', 'default');
+}
+
+function renderAssistants() {
+  const list = S.assistants || [];
+  $('assistantRows').innerHTML = list.length ? list.map(a => `
+    <tr><td><code>${esc(a.name)}</code></td><td>${esc(a.default_agent)}</td>
+    <td class="muted">${a.memory_count || 0}</td>
+    <td class="muted">${esc(new Date(a.created_at).toLocaleString())}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="muted">还没有机器人</td></tr>';
+  const current = $('memAssistant').value;
+  $('memAssistant').innerHTML = options(list, 'name', 'name', current || 'default');
+  loadMemories();
+}
+
+const SCOPE_LABELS = { assistant: '机器人', project: '项目', chat: '会话', user: '用户' };
+
+async function loadMemories() {
+  const assistant = $('memAssistant').value;
+  if (!assistant) { $('memoryRows').innerHTML = '<tr><td colspan="5" class="muted">先创建机器人</td></tr>'; return; }
+  try {
+    const data = await api('/memories?assistant=' + encodeURIComponent(assistant));
+    const items = data.items || [];
+    $('memoryRows').innerHTML = items.length ? items.map(m => `
+      <tr><td>#${m.id}</td>
+      <td class="muted">${esc(SCOPE_LABELS[m.scope_type] || m.scope_type)}${m.scope_id ? ' · ' + esc(m.scope_id) : ''}</td>
+      <td>${esc(m.kind)}</td><td>${esc(m.content)}</td>
+      <td><button class="mini danger" onclick="forgetMemory(${m.id})">删除</button></td></tr>`).join('')
+      : '<tr><td colspan="5" class="muted">还没有记忆。聊天里用 /remember，或在上面写入。</td></tr>';
+  } catch (e) {
+    $('memoryRows').innerHTML = `<tr><td colspan="5" class="bad">${esc(e.message)}</td></tr>`;
+  }
+}
+
+function createAssistant(e) {
+  e.preventDefault();
+  run(() => api('/assistants', { method: 'POST', body: JSON.stringify({
+    name: $('aName').value.trim(), default_agent: $('aAgent').value }) }));
+}
+
+function createMemory(e) {
+  e.preventDefault();
+  const scope = $('memScope').value;
+  run(() => api('/memories', { method: 'POST', body: JSON.stringify({
+    assistant: $('memAssistant').value,
+    scope_type: scope,
+    scope_id: scope === 'assistant' ? '' : $('memScopeId').value.trim(),
+    kind: $('memKind').value.trim() || 'fact',
+    content: $('memText').value.trim(),
+  }) }));
+}
+
+function forgetMemory(id) {
+  if (!confirm(`删除记忆 #${id}？`)) return;
+  run(() => api('/memories/forget', { method: 'POST', body: JSON.stringify({
+    assistant: $('memAssistant').value, id }) }));
+}
+
+function renderModels() {
+  $('modelRows').innerHTML = S.models.length ? S.models.map(m => `
+    <tr><td>${esc(m.id)}</td><td>${esc(m.display_name)}</td><td>${esc(m.provider)}</td>
+    <td class="ok">enabled</td></tr>`).join('') : '<tr><td colspan="4" class="muted">还没有模型</td></tr>';
+  $('modelDefaults').innerHTML = S.projects.length ? S.projects.map((p, i) => `
+    <tr><td>${esc(p.name)}</td><td>${esc(p.default_model || '未设置')}</td>
+    <td><select id="pm-${i}">${options(S.models, 'id', 'display_name', p.default_model)}</select>
+    <button class="mini" onclick="setDefault(${i})">设为默认</button></td></tr>`).join('')
+    : '<tr><td colspan="3" class="muted">先创建项目</td></tr>';
+}
+
+function renderAccess() {
+  $('userRows').innerHTML = S.users.length ? S.users.map((u, i) => `
+    <tr><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td class="muted">${u.disabled ? 'disabled' : 'active'}</td>
+    <td><select id="ur-${i}">${options(['owner','admin','operator','viewer'], null, null, u.role)}</select>
+    <button class="mini" onclick="changeRole(${i})">保存</button></td></tr>`).join('')
+    : '<tr><td colspan="4" class="muted">还没有成员</td></tr>';
+  $('identityRows').innerHTML = S.identities.length ? S.identities.map(i => `
+    <tr><td>${esc(i.platform)}</td><td>${esc(i.external_id)}</td><td>${esc(i.email)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="muted">还没有身份映射</td></tr>';
+  $('grantRows').innerHTML = S.grants.length ? S.grants.map(g => `
+    <tr><td>${esc(g.project)}</td><td>${esc(g.email)}</td><td>${esc(g.role)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="muted">还没有项目授权</td></tr>';
+}
+
+function renderBindings() {
+  $('bindingRows').innerHTML = S.bindings.length ? S.bindings.map(b => `
+    <tr><td><code>${esc(b.id)}</code></td><td>${esc(b.platform)}</td>
+    <td>${esc(b.assistant_id || 'default')}</td><td>${esc(b.project)}</td>
+    <td>${esc((b.channels || []).join(', '))}</td><td class="muted">${esc((b.allowed_users || []).join(', '))}</td>
+    <td><button class="mini" onclick="testBinding('${esc(b.id)}')">测试</button>
+    <button class="mini" onclick="sendTest('${esc(b.id)}')">发消息</button>
+    <button class="mini danger" onclick="unbind('${esc(b.id)}')">解绑</button></td></tr>`).join('')
+    : '<tr><td colspan="7" class="muted">还没有绑定</td></tr>';
+}
+
+async function loadDoctor() {
+  try {
+    const data = await api('/doctor');
+    $('doctor').innerHTML = data.checks.map(c => `
+      <div style="padding:4px 0"><span class="${c.ok ? 'ok' : 'bad'}">${c.ok ? 'OK' : 'FAIL'}</span>
+      <b>${esc(c.name)}</b> <span class="muted">${esc(c.detail)}</span>
+      ${!c.ok && c.fix ? `<div class="err">fix: ${esc(c.fix)}</div>` : ''}</div>`).join('');
+  } catch (e) { $('doctor').textContent = e.message; }
+}
+
+async function loadAudit() {
+  try {
+    const data = await api('/audit');
+    $('auditStatus').innerHTML = data.ok ? '<span class="ok">哈希链完整</span>' : `<span class="bad">链断裂 @ ${data.broken_at}</span>`;
+    $('auditRows').innerHTML = (data.events || []).slice().reverse().map(e => `
+      <tr><td>${e.seq}</td><td class="muted">${new Date(e.ts).toLocaleString()}</td>
+      <td>${esc(e.action)}</td><td>${esc(e.target)}</td><td>${esc(e.result)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="muted">没有审计事件</td></tr>';
+  } catch (e) { $('auditStatus').textContent = e.message; }
+}
+
+function tab(name) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === name));
+}
+
+function toggleTokenFields() {
+  const p = $('bPlatform').value;
+  $('slackTokens').classList.toggle('hidden', p !== 'slack');
+  $('bToken').classList.toggle('hidden', p !== 'telegram');
+  $('feishuTokens').classList.toggle('hidden', p !== 'feishu');
+}
+
+async function run(fn, okMsg) {
+  try { await fn(); } catch (e) { alert(e.message); return; }
+  if (okMsg) console.log(okMsg);
+  await boot();
+}
+
+function createProject(e) {
+  e.preventDefault();
+  run(() => api('/projects', { method: 'POST', body: JSON.stringify({
+    name: $('pName').value.trim(), workdir: $('pWorkdir').value.trim(),
+    agent: $('pAgent').value, permission_mode: $('pPerm').value }) }));
+}
+
+function changePermission(i) {
+  const p = S.projects[i];
+  run(() => api('/projects/permission', { method: 'POST', body: JSON.stringify({
+    project: p.name, mode: $('pp-' + i).value }) }));
+}
+
+function createModel(e) {
+  e.preventDefault();
+  run(() => api('/models', { method: 'POST', body: JSON.stringify({
+    id: $('mId').value.trim(), display_name: $('mName').value.trim(), provider: $('mProvider').value.trim() }) }));
+}
+
+function setDefault(i) {
+  const p = S.projects[i];
+  run(() => api('/models/default', { method: 'POST', body: JSON.stringify({
+    project: p.name, model: $('pm-' + i).value }) }));
+}
+
+function addUser(e) {
+  e.preventDefault();
+  run(() => api('/users', { method: 'POST', body: JSON.stringify({
+    email: $('uEmail').value.trim(), role: $('uRole').value }) }));
+}
+
+function changeRole(i) {
+  const u = S.users[i];
+  run(() => api('/users/role', { method: 'POST', body: JSON.stringify({
+    email: u.email, role: $('ur-' + i).value }) }));
+}
+
+function mapUser(e) {
+  e.preventDefault();
+  run(() => api('/users/map', { method: 'POST', body: JSON.stringify({
+    platform: $('iPlatform').value, external_id: $('iExternal').value.trim(),
+    email: $('iEmail').value.trim() }) }));
+}
+
+function grant(e) {
+  e.preventDefault();
+  run(() => api('/grants', { method: 'POST', body: JSON.stringify({
+    project: $('gProject').value, email: $('gEmail').value.trim(), role: $('gRole').value }) }));
+}
+
+let feishuTimer = null;
+
+async function feishuSetup() {
+  const project = $('bProject').value;
+  if (!project) return alert('先选择一个项目');
+  clearInterval(feishuTimer);
+  $('feishuSetupMsg').textContent = '正在创建…';
+  try {
+    const begin = await api('/setup/feishu/begin', { method: 'POST', body: '{}' });
+    $('feishuSetupLink').href = begin.qr_url;
+    $('feishuSetupLink').textContent = begin.qr_url;
+    $('feishuSetupBox').classList.remove('hidden');
+    $('feishuSetupMsg').textContent = '请在手机飞书打开上面的链接完成授权，等待中…';
+    const credential = 'feishu_' + project;
+    feishuTimer = setInterval(async () => {
+      try {
+        const poll = await api('/setup/feishu/poll', {
+          method: 'POST',
+          body: JSON.stringify({
+            device_code: begin.device_code, base_url: begin.base_url,
+            credential,
+          }),
+        });
+        if (poll.status === 'pending') return;
+        clearInterval(feishuTimer);
+        if (poll.status !== 'completed') {
+          $('feishuSetupMsg').textContent = '授权失败：' + (poll.error || poll.status);
+          return;
+        }
+        $('feishuSetupMsg').textContent =
+          `应用已创建：${poll.app_id}，凭证已保存为 ${poll.credential}。已填入 owner open_id，可直接点“绑定”测试私聊。`;
+        if (poll.owner_open_id) {
+          $('bAllow').value = poll.owner_open_id;
+          if (!$('bChannel').value.trim()) $('bChannel').value = poll.owner_open_id;
+        }
+        $('bPlatform').value = 'feishu';
+        $('bDomain').value = poll.platform === 'lark' ? 'lark' : 'feishu';
+        toggleTokenFields();
+      } catch (e) {
+        clearInterval(feishuTimer);
+        $('feishuSetupMsg').textContent = e.message;
+      }
+    }, Math.max(3, begin.interval || 5) * 1000);
+  } catch (e) {
+    $('feishuSetupMsg').textContent = e.message;
+  }
+}
+
+function createBinding(e) {
+  e.preventDefault();
+  const platform = $('bPlatform').value;
+  const body = {
+    assistant: $('bAssistant').value,
+    project: $('bProject').value,
+    platform,
+    credential: platform + '_' + $('bProject').value,
+    channel: $('bChannel').value.trim(),
+    allowed_users: $('bAllow').value.trim(),
+    mention_only: $('bMention').checked,
+  };
+  if (platform === 'slack') {
+    body.app_token = $('bApp').value.trim();
+    body.bot_token = $('bBot').value.trim();
+  } else if (platform === 'telegram') {
+    body.token = $('bToken').value.trim();
+  } else {
+    body.app_id = $('bAppId').value.trim();
+    body.app_secret = $('bAppSecret').value.trim();
+    body.domain = $('bDomain').value;
+  }
+  run(() => api('/bindings', { method: 'POST', body: JSON.stringify(body) }));
+}
+
+async function testBinding(id) {
+  const b = S.bindings.find(x => x.id === id);
+  if (!b) return;
+  try {
+    const data = await api('/bindings/test', { method: 'POST', body: JSON.stringify({
+      platform: b.platform, credential: b.credential }) });
+    alert(data.ok ? '连接成功：' + data.detail : '连接失败：' + data.error);
+  } catch (e) { alert(e.message); }
+}
+
+async function sendTest(id) {
+  const b = S.bindings.find(x => x.id === id);
+  if (!b) return;
+  const channel = (b.channels || [])[0];
+  if (!confirm(`向 ${channel} 发送一条测试消息？`)) return;
+  try {
+    const data = await api('/bindings/test', { method: 'POST', body: JSON.stringify({
+      platform: b.platform, credential: b.credential, channel, send: true,
+      text: 'WardenDeck 测试消息',
+    }) });
+    alert(data.ok ? '已发送：' + data.detail : '发送失败：' + data.error);
+  } catch (e) { alert(e.message); }
+}
+
+function unbind(id) {
+  if (!confirm('确定解绑？')) return;
+  run(() => api('/bindings/delete', { method: 'POST', body: JSON.stringify({ id }) }));
+}
+
+async function sendMock(e) {
+  e.preventDefault();
+  try {
+    const data = await api('/mock/message', { method: 'POST', body: JSON.stringify({
+      project: $('mockProject').value, user: $('mockUser').value.trim(), text: $('mockText').value.trim() }) });
+    $('mockOut').textContent = data.reply + '\n' + data.note;
+    loadAudit();
+  } catch (e) { $('mockOut').textContent = e.message; }
+}
+
+async function verifyAudit() {
+  try {
+    const data = await api('/audit');
+    $('auditStatus').innerHTML = data.ok ? '<span class="ok">哈希链完整</span>' : `<span class="bad">链断裂 @ ${data.broken_at}: ${esc(data.error)}</span>`;
+  } catch (e) { $('auditStatus').textContent = e.message; }
+}
+
+toggleTokenFields();
+boot();
+</script>
+</body>
+</html>

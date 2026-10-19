@@ -1,0 +1,54 @@
+{
+  "name": "wardendeck",
+  "version": "0.1.0-prototype",
+  "description": "Self-hosted, secure control plane for local AI coding agents",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bocoboho/wardendeck.git"
+  },
+  "homepage": "https://github.com/bocoboho/wardendeck#readme",
+  "bugs": {
+    "url": "https://github.com/bocoboho/wardendeck/issues"
+  },
+  "author": "WardenDeck contributors",
+  "type": "module",
+  "bin": {
+    "wardendeck": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "web",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "dev": "npm run build && node dist/cli.js",
+    "test": "npm run build && node --test dist/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "ai-agents",
+    "self-hosted",
+    "feishu",
+    "lark",
+    "slack",
+    "telegram",
+    "im",
+    "approval",
+    "audit"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.76.0"
+  }
+}

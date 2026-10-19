@@ -1,0 +1,17 @@
+node_modules/
+dist/
+
+# local data, credentials and logs
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+secrets.json
+.env
+.env.*
+*.log
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/

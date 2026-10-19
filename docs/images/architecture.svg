@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="380" viewBox="0 0 900 380" role="img" aria-label="Feishu or Lark messages flow through WardenDeck to Claude Code on your machine">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="899" height="379" rx="16" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <!-- Feishu / Lark -->
+  <rect x="40" y="110" width="180" height="150" rx="12" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="130" y="145" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#1d4ed8">Feishu / Lark</text>
+  <text x="130" y="175" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#334155">手机 · 私聊 · 群聊</text>
+  <text x="130" y="200" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#334155">long connection</text>
+  <text x="130" y="225" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#64748b">allowed_users</text>
+
+  <!-- WardenDeck -->
+  <rect x="330" y="40" width="250" height="300" rx="16" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/>
+  <text x="455" y="76" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">WardenDeck</text>
+  <text x="455" y="98" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" fill="#64748b">self-hosted control plane</text>
+
+  <rect x="352" y="124" width="206" height="38" rx="8" fill="#fffbeb" stroke="#fde68a"/>
+  <circle cx="370" cy="143" r="5" fill="#f59e0b"/>
+  <text x="384" y="148" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#78350f">Tool approvals</text>
+
+  <rect x="352" y="170" width="206" height="38" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <circle cx="370" cy="189" r="5" fill="#10b981"/>
+  <text x="384" y="194" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#064e3b">Audit hash chain</text>
+
+  <rect x="352" y="216" width="206" height="38" rx="8" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <circle cx="370" cy="235" r="5" fill="#8b5cf6"/>
+  <text x="384" y="240" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#4c1d95">Long-term memory</text>
+
+  <rect x="352" y="262" width="206" height="38" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+  <circle cx="370" cy="281" r="5" fill="#3b82f6"/>
+  <text x="384" y="286" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#1e3a8a">macOS sandbox</text>
+
+  <!-- Claude Code -->
+  <rect x="670" y="110" width="190" height="150" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="765" y="145" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#c2410c">Claude Code</text>
+  <text x="765" y="175" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#334155">your machine</text>
+  <text x="765" y="200" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#334155">cwd = project.workdir</text>
+  <text x="765" y="225" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#64748b">stream-json session</text>
+
+  <!-- Arrows -->
+  <line x1="220" y1="165" x2="326" y2="165" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="273" y="157" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" fill="#475569">message</text>
+
+  <line x1="580" y1="150" x2="666" y2="150" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="623" y="142" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" fill="#475569">prompt</text>
+
+  <line x1="666" y1="235" x2="584" y2="235" stroke="#64748b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="625" y="227" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" fill="#475569">tool request</text>
+
+  <line x1="326" y1="278" x2="224" y2="278" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="275" y="270" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" fill="#475569">card · result</text>
+</svg>

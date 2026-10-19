@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="64" viewBox="0 0 380 64" role="img" aria-label="WardenDeck">
+  <rect x="0.5" y="0.5" width="379" height="63" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="12" y="8" width="48" height="48" rx="12" fill="#0f172a"/>
+  <path d="M36 17l13 5v10c0 8-5.5 14-13 17-7.5-3-13-9-13-17V22z" fill="none" stroke="#2dd4bf" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M29 33l4.8 4.8L43 28" fill="none" stroke="#2dd4bf" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="72" y="41" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="29" font-weight="700" fill="#0f172a">Warden<tspan fill="#0d9488">Deck</tspan></text>
+</svg>
