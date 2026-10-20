@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as Lark from '@larksuiteoapi/node-sdk';
 import {
-  ClaudeSession, TurnLimitError,
+  ClaudeSession, SessionClosedError, TurnLimitError,
   type AgentEvent, type PermissionDecision, type PermissionRequest,
 } from './claude.js';
 import { parseFeishuSecret } from './platform.js';
@@ -311,20 +311,59 @@ interface Approval {
   timer: NodeJS.Timeout;
 }
 
-function approvalResultCard(toolName: string, allow: boolean) {
+/**
+ * After a decision the card must shrink out of the way: the chat should read
+ * as a short one-line receipt, not another full-height card. A collapsed
+ * collapsible panel keeps the detail one tap away without taking space.
+ */
+function approvalResultCard(toolName: string, decision: PermissionDecision) {
+  const allow = decision.behavior === 'allow';
+  const scope = allow
+    ? (decision.allowForMinutes ? `已允许 ${decision.allowForMinutes} 分钟` : '已允许本次')
+    : '已拒绝';
   return {
     config: { wide_screen_mode: true, update_multi: true },
-    header: {
-      template: allow ? 'green' : 'red',
-      title: { tag: 'plain_text', content: allow ? '已允许' : '已拒绝' },
-    },
     elements: [
       {
-        tag: 'div',
-        text: {
-          tag: 'lark_md',
-          content: `工具：\`${toolName}\`\n${allow ? '继续执行中…' : '该操作不会执行。'}`,
+        tag: 'collapsible_panel',
+        expanded: false,
+        header: {
+          title: { tag: 'plain_text', content: `${allow ? '✅' : '🚫'} ${scope} · ${toolName}` },
+          vertical_align: 'center',
+          icon: {
+            tag: 'standard_icon',
+            token: 'down-small-ccm_outlined',
+            size: '16px 16px',
+          },
+          icon_position: 'right',
+          icon_expanded_angle: -180,
         },
+        elements: [
+          {
+            tag: 'div',
+            text: {
+              tag: 'lark_md',
+              content: allow ? '操作已放行，Agent 继续执行。' : '该操作不会执行。',
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Minimal one-line receipt, used if the client rejects the collapsible panel. */
+function approvalPlainResultCard(toolName: string, decision: PermissionDecision) {
+  const allow = decision.behavior === 'allow';
+  const scope = allow
+    ? (decision.allowForMinutes ? `已允许 ${decision.allowForMinutes} 分钟` : '已允许本次')
+    : '已拒绝';
+  return {
+    config: { wide_screen_mode: true, update_multi: true },
+    elements: [
+      {
+        tag: 'note',
+        elements: [{ tag: 'plain_text', content: `${allow ? '✅' : '🚫'} ${scope} · ${toolName}` }],
       },
     ],
   };
@@ -542,7 +581,7 @@ export class FeishuConnectors {
           this.resolveApproval(id, { behavior: 'deny', message: '用户已停止任务。' }, openId);
         }
       }
-      this.sessions.get(key)?.session.close();
+      this.sessions.get(key)?.session.close(true);
       this.sessions.delete(key);
       this.store.audit(openId, 'agent.stop', binding.project, 'ok');
       await replyText(client, msg.message_id, '已停止当前任务。');
@@ -714,8 +753,9 @@ export class FeishuConnectors {
     } catch (err) {
       // A stale --resume id is the most common recoverable failure, but a
       // per-turn limit must stop the message rather than retry it — retrying
-      // would hand the same message a fresh quota.
-      if (err instanceof TurnLimitError) {
+      // would hand the same message a fresh quota. A closed session is a
+      // user-requested stop: retrying would restart the task they cancelled.
+      if (err instanceof TurnLimitError || err instanceof SessionClosedError) {
         clearInterval(heartbeat);
         await this.failTurn(card, binding, err);
         return;
@@ -784,7 +824,9 @@ export class FeishuConnectors {
 
   private async failTurn(card: TurnCard, binding: Binding, err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    const message = err instanceof TurnLimitError ? detail : `Claude Code 执行失败：${detail}`;
+    const message = err instanceof TurnLimitError || err instanceof SessionClosedError
+      ? detail
+      : `Claude Code 执行失败：${detail}`;
     await card.fail(`[WardenDeck] ${message}`).catch(() => {});
     this.store.audit('wardendeck', 'agent.error', binding.project, message);
   }
@@ -802,8 +844,12 @@ export class FeishuConnectors {
     } catch (err) {
       console.error('[feishu] permission card:', err instanceof Error ? err.message : err);
     }
-    await replyText(client, msg.message_id,
-      `需要权限：${req.toolName}\n${summarize(req, 500)}\n回复 1 允许一次 / 2 允许 30 分钟 / 3 拒绝，或点击卡片按钮。`).catch(() => {});
+    // Only when the card could not be sent: otherwise this repeats the same
+    // content in the chat and doubles the vertical space the request takes.
+    if (!cardId) {
+      await replyText(client, msg.message_id,
+        `需要权限：${req.toolName}\n${summarize(req, 500)}\n回复 1 允许一次 / 2 允许 30 分钟 / 3 拒绝。`).catch(() => {});
+    }
     this.store.audit('wardendeck', 'approval.request', req.toolName, summarize(req, 500));
 
     return new Promise<PermissionDecision>(resolve => {
@@ -855,19 +901,27 @@ export class FeishuConnectors {
       : 'deny';
     this.store.audit(actor, 'approval.decide', id, result);
     const allow = decision.behavior === 'allow';
+    if (approval.cardId) {
+      const patch = (content: object) => approval.client.im.v1.message.patch({
+        path: { message_id: approval.cardId },
+        data: { content: JSON.stringify(content) },
+      });
+      // Replace the buttons with the outcome so the card cannot be clicked again.
+      // Older clients that don't render collapsible panels get a one-line note.
+      patch(approvalResultCard(approval.toolName, decision)).catch(err => {
+        console.error('[feishu] approval card patch:', err instanceof Error ? err.message : err);
+        return patch(approvalPlainResultCard(approval.toolName, decision));
+      }).catch(err => console.error('[feishu] approval card patch (plain):',
+        err instanceof Error ? err.message : err));
+      // The patched card already states the outcome; a separate message is noise.
+      return;
+    }
+    // No card (card send failed): the text reply is the only confirmation left.
     const text = allow
       ? (decision.allowForMinutes
         ? `已允许 ${decision.allowForMinutes} 分钟内的工具调用。`
         : '已允许本次操作。')
       : '已拒绝本次操作。';
-    if (approval.cardId) {
-      // Replace the buttons with the outcome so the card cannot be clicked again.
-      approval.client.im.v1.message.patch({
-        path: { message_id: approval.cardId },
-        data: { content: JSON.stringify(approvalResultCard(approval.toolName, allow)) },
-      }).catch(err => console.error('[feishu] approval card patch:',
-        err instanceof Error ? err.message : err));
-    }
     replyText(approval.client, approval.userMessageId, text).catch(() => {});
   }
 }

@@ -48,6 +48,18 @@ export class TurnLimitError extends Error {
 }
 
 /**
+ * The session was closed from outside the turn (user /stop, service shutdown).
+ * Callers must treat this as terminal: retrying would silently restart the
+ * exact task the user just cancelled.
+ */
+export class SessionClosedError extends Error {
+  constructor(message = '任务已停止。') {
+    super(message);
+    this.name = 'SessionClosedError';
+  }
+}
+
+/**
  * Paths the agent must not read or execute. Messaging bridges often keep bot
  * credentials in plain text on disk — an unrestricted agent can read them and
  * send messages as another bot. Callers pass WardenDeck's own data directory;
@@ -90,6 +102,7 @@ export class ClaudeSession {
   private turnTimer?: NodeJS.Timeout;
   private toolCallCount = 0;
   private closed = false;
+  private cancelled = false;
   private onEvent?: (event: AgentEvent) => void;
 
   private memoryInjected = false;
@@ -117,7 +130,9 @@ export class ClaudeSession {
     onPermission: (req: PermissionRequest) => Promise<PermissionDecision>,
     onEvent?: (event: AgentEvent) => void,
   ): Promise<string> {
-    if (this.closed) throw new Error('Claude session is closed');
+    if (this.closed) {
+      throw this.cancelled ? new SessionClosedError() : new Error('Claude session is closed');
+    }
     if (this.current) throw new Error('Claude session is busy');
     this.ensureProcess();
     this.clearIdle();
@@ -173,13 +188,19 @@ export class ClaudeSession {
     if (this.current) clearTimeout(this.current.timer);
   }
 
-  close() {
+  /**
+   * Close the session. `cancelled` marks a user-requested stop, so the
+   * pending turn rejects with SessionClosedError and callers must not retry.
+   * Other closes keep the generic error, preserving the resume-retry path.
+   */
+  close(cancelled = false) {
     this.closed = true;
+    this.cancelled = cancelled;
     this.clearIdle();
     this.clearTurnTimer();
     if (this.current) {
       clearTimeout(this.current.timer);
-      this.current.reject(new Error('Claude session closed'));
+      this.current.reject(cancelled ? new SessionClosedError() : new Error('Claude session closed'));
       this.current = undefined;
     }
     this.kill();
