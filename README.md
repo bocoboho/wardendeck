@@ -4,7 +4,7 @@
 
 ### Your computer, one chat message away.
 
-WardenDeck is a **self-hosted control plane** that connects Feishu/Lark to the coding agents running on your own machine. Send a message from your phone, watch the work happen live, approve risky tool calls, and keep a tamper-evident record of everything the agent did — without exposing your machine to the internet.
+WardenDeck is a **self-hosted control plane** that puts the coding agents on your machine behind Feishu/Lark. Send a task from your phone, watch it run live, approve risky tool calls, and keep a tamper-evident record — with no inbound port and no data leaving your machine.
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -21,21 +21,13 @@ WardenDeck is a **self-hosted control plane** that connects Feishu/Lark to the c
 
 ---
 
-## Why WardenDeck?
+## What you get
 
-WardenDeck lets you:
-
-- **📱 Work from anywhere.** Your phone is the terminal. Send a task from Feishu, watch the live execution card, approve what matters, and read the result — all without remote desktop, SSH, or another app.
-
-- **🛡️ Approve before it acts.** Every tool call can pause for your approval: allow once, allow for 30 minutes, or deny. Approvals are bound to the person who started the task, not just to whoever clicks first.
-
-- **🧾 Prove what happened.** Inbound messages, approval requests and decisions, agent runs, outbound messages, and attachments all go into an append-only audit log protected by a SHA-256 hash chain. Tampering is detectable, not just discouraged.
-
-- **🔒 Keep the agent in a box.** On macOS the Claude Code process and every tool it spawns run under `sandbox-exec`. They cannot read WardenDeck's credentials or execute other bridge tools — enforced by the kernel, not by a prompt.
-
-- **🧠 Give every bot a memory.** Long-term memory is owned by the bot, not by an agent's home directory. Four scopes (assistant / project / chat / user) merge from broad to specific, with per-scope token budgets and relevance ranking.
-
-- **🏠 Own the whole stack.** Data lives in a local SQLite file, credentials are encrypted with your installation's `master.key`, the server listens on `127.0.0.1` by default, and the web console can be turned off entirely.
+- **📱 Work from anywhere.** Your phone is the terminal — no SSH, remote desktop, or second app.
+- **🛡️ Approve before it acts.** Each tool call can pause for your approval: once, 30 minutes, or deny. Only the person who started the task can approve it.
+- **🧾 Prove what happened.** Messages, approvals, agent runs, and attachments go into an append-only log secured by a SHA-256 hash chain.
+- **🔒 Keep the agent in a box.** On macOS, Claude Code and every tool it spawns run under `sandbox-exec`, enforced by the kernel.
+- **🧠 Own the whole stack.** Per-bot memory (assistant / project / chat / user scopes), encrypted credentials, local SQLite, and a console that listens on `127.0.0.1` only.
 
 ---
 
@@ -43,174 +35,109 @@ WardenDeck lets you:
 
 ### Requirements
 
-- **Node.js >= 22.13** — uses the built-in `node:sqlite` and `fetch`
-- **macOS or Linux** — kernel-level sandboxing is currently macOS-only
-- **Claude Code installed and logged in** — `claude` must be on your `PATH`
-- **A Feishu/Lark custom app** — created automatically by the QR flow, or bring your own
-
-```bash
-node -v          # must be v22.13 or newer
-claude --version
-```
+- **Node.js >= 22.13** (uses built-in `node:sqlite`)
+- **macOS or Linux** (kernel sandbox is macOS-only)
+- **Claude Code installed and logged in** — `claude` on your `PATH`
 
 ### 1. Install
 
 ```bash
 git clone https://github.com/bocoboho/wardendeck.git
 cd wardendeck
-
-npm install
-npm run build
+npm install && npm run build
 npm link
 ```
 
-`npm link` puts `wardendeck` on your `PATH`. Verify the installation:
-
-```bash
-wardendeck version
-wardendeck agents        # should list claudecode
-```
-
-<details>
-<summary>Prefer not to install globally?</summary>
-
-Every command works with the local binary:
-
-```bash
-node dist/cli.js <command> ...
-```
-
-</details>
+`npm link` puts `wardendeck` on your `PATH`. Without it, use `node dist/cli.js <command>` instead.
 
 ### 2. Initialize and create a project
 
 ```bash
 wardendeck init --admin-email you@example.com
-```
-
-This creates `~/.wardendeck` (`0700`), a `master.key`, the SQLite database (`0600`), the owner account, and a **one-time setup token** for the web console. Store the token; it is printed only once.
-
-> [!IMPORTANT]
-> Back up `~/.wardendeck/master.key` together with the database. It is the only key that can decrypt your saved platform credentials.
-
-Create a project pointing at a real working directory:
-
-```bash
 mkdir -p ~/code/demo
 wardendeck project create --name demo --workdir ~/code/demo
 ```
 
-The local agent is detected automatically. To be explicit:
+`init` creates `~/.wardendeck` (`0700`), `master.key`, the database, and a one-time web console token. The local agent is detected automatically.
 
-```bash
-wardendeck project create --name demo --workdir ~/code/demo --agent claudecode
-```
-
-```bash
-wardendeck status
-```
+> [!IMPORTANT]
+> Back up `~/.wardendeck/master.key` with the database. It is the only key that can decrypt saved credentials.
 
 ### 3. Connect Feishu / Lark
-
-Create the app with the QR flow:
 
 ```bash
 wardendeck feishu setup --project demo
 ```
 
-Open the printed link on your phone and approve. WardenDeck creates the app, stores `app_id`, `app_secret`, and `owner_open_id` (encrypted), and — if the project exists — **automatically binds your private chat** to it.
+Open the printed link on your phone and approve. WardenDeck creates the app, stores the credential (`feishu_demo`), and **binds your private chat automatically**.
+
+> [!NOTE]
+> In the Feishu console, enable **Event subscription → long connection** and subscribe to `im.message.receive_v1`. For approval buttons, add the `card.action.trigger` callback; without it, reply `1 / 2 / 3` to approve.
 
 <details>
 <summary>Use an existing Feishu app instead</summary>
 
 1. Create a **custom app** in the [Feishu Open Platform](https://open.feishu.cn/app) (use `open.larksuite.com` for Lark).
-2. Copy the App ID and App Secret from **Credentials & Basic Info**.
-3. Enable the **Bot** capability and request `im:message`, `im:message:send_as_bot`, and `im:chat:readonly`.
-4. Publish a version.
-5. Save the credential:
+2. Enable **Bot**, request `im:message`, `im:message:send_as_bot`, and `im:chat:readonly`.
+3. Enable the long-connection event subscription described above, then publish a version.
+4. Save the credential and bind a chat:
 
 ```bash
 wardendeck secret set feishu_demo --value "cli_xxx
 app_secret_xxx"
+
+wardendeck platform bind --project demo --platform feishu \
+  --credential feishu_demo --channel oc_xxx
 ```
 
-The first line is the App ID, the second is the App Secret. Add a third line `lark` for the international version.
-
-Verify it:
-
-```bash
-wardendeck platform test --platform feishu --credential feishu_demo
-# OK: app=cli_xxx bot=your-bot domain=feishu
-```
+The first line is the App ID and the second is the App Secret; add a third line `lark` for the international version. Without `--allowed-users`, only the app owner is allowed.
 
 </details>
 
-> [!NOTE]
-> In the Feishu console, set **Event subscription** to **long connection** and subscribe to `im.message.receive_v1`. Add the `card.action.trigger` callback if you want approval buttons; without it, replying `1 / 2 / 3` still works.
+<details>
+<summary>Bind a group chat (optional)</summary>
 
-### 4. Bind a chat
-
-The QR flow already binds your private chat. For a group, add the bot to the group first, then ask WardenDeck for the chat ID:
+Add the bot to the group, list its chats, then bind the group's `oc_...` ID:
 
 ```bash
 wardendeck feishu chats --credential feishu_demo
-# oc_xxx	group	My Group
-```
-
-Bind it:
-
-```bash
 wardendeck platform bind --project demo --platform feishu \
-  --credential feishu_demo \
-  --channel oc_xxx
+  --credential feishu_demo --channel oc_xxx --allowed-users ou_aaa,ou_bbb
 ```
 
-`--allowed-users` defaults to the app owner's `open_id`. Pass an explicit list to allow teammates:
+In groups the bot only responds when **this bot** is @-mentioned.
 
-```bash
---allowed-users ou_aaa,ou_bbb
-```
+</details>
 
-> [!TIP]
-> Running `serve` picks up new bindings and rotated credentials within five seconds. No restart needed.
-
-### 5. Send your first message
+### 4. Start and send a message
 
 ```bash
 wardendeck serve
 ```
 
-Open Feishu and message the bot:
+Message the bot in Feishu:
 
 > 你好，看一下这个目录里有什么
 
-You should see an execution card under your message. It updates in place with tool progress (`🔧 Bash`, `📖 Read`), pauses for approval when needed, and turns green when the run finishes.
+An execution card appears under your message, updates in place with tool progress, pauses for approval, and turns green when done.
 
-- Reply `1` to allow once, `2` to allow for 30 minutes, `3` to deny.
-- Send `/stop` to cancel the current task.
-- In a group, the bot only responds when **@-mentioned**.
+- Reply `1` allow once · `2` allow 30 minutes · `3` deny
+- Send `/stop` to cancel the current task
+- The web console is at <http://127.0.0.1:8787> (sign in with the token from `init`). Disable it with `wardendeck serve --no-web`.
 
 > [!NOTE]
-> A laptop that sleeps is offline. Keep the machine awake with `caffeinate -is wardendeck serve`, or run WardenDeck on an always-on host.
-
-### 6. Open the web console (optional)
-
-```bash
-open http://127.0.0.1:8787
-```
-
-Sign in with the setup token printed by `init`. The console manages projects, bots, members, platform bindings, memory, and the audit log. It is only a client of the API: `wardendeck serve --no-web` disables the UI and leaves the API and CLI untouched.
+> A sleeping laptop is offline. Keep it awake with `caffeinate -is wardendeck serve`, or run WardenDeck on an always-on host.
 
 ---
 
 ## How it works
 
 1. Feishu delivers `im.message.receive_v1` over a long connection.
-2. WardenDeck matches the `chat_id` / `open_id` against a binding, checks `allowed_users` and the @-mention rule, and writes `message.inbound` to the audit log.
-3. The message is queued per chat and written to a persistent Claude Code process running with `--output-format stream-json --input-format stream-json` in the project's `workdir`.
-4. When Claude Code asks for a tool permission (`control_request`), WardenDeck sends an approval card and waits. The idle timer is paused while a human decides.
-5. Progress events patch the same message card in place; the final answer completes it and writes `message.outbound` to the audit log.
-6. The native session ID is saved per chat and reused with `--resume` on the next message.
+2. WardenDeck matches the chat against a binding, checks `allowed_users` and the @-mention rule, and records `message.inbound`.
+3. The message is queued per chat and written to a persistent Claude Code process in the project's `workdir`.
+4. Tool permission requests become approval cards; the idle timer pauses while a human decides.
+5. Progress patches the same card; the final answer completes it and records `message.outbound`.
+6. The native session ID is saved per chat and reused with `--resume`.
 
 ---
 
@@ -218,16 +145,16 @@ Sign in with the setup token printed by `init`. The console manages projects, bo
 
 | Layer | What it does |
 |---|---|
-| **Allowlist** | Bindings require `allowed_users`. When omitted, only the app owner is allowed. Unknown chats get no response at all. |
+| **Allowlist** | Bindings require `allowed_users`; unknown chats get no response. Omitting it defaults to the app owner. |
 | **Mentions** | Group chats respond only when this specific bot is @-mentioned. |
-| **Approvals** | Tool calls follow the project's permission mode. Only the person who started the task can approve it. |
-| **Sandbox** | macOS `sandbox-exec` denies reads and execution under the data directory and `WARDENDECK_DENY_PATHS`. |
-| **Secrets** | Platform credentials are encrypted with AES-256-GCM using `master.key`. |
-| **Audit** | Append-only events with a SHA-256 hash chain; `wardendeck audit verify` checks integrity. |
-| **Network** | Listens on `127.0.0.1` by default. No inbound public port is required. |
+| **Approvals** | Tool calls follow the project's permission mode; only the task starter can approve. |
+| **Sandbox** | macOS `sandbox-exec` denies access to the data directory and `WARDENDECK_DENY_PATHS`. |
+| **Secrets** | Credentials encrypted with AES-256-GCM using `master.key`. |
+| **Audit** | Append-only SHA-256 hash chain; `wardendeck audit verify` checks integrity. |
+| **Network** | Listens on `127.0.0.1` by default; no inbound public port. |
 | **Files** | Data directory `0700`; database and master key `0600`. |
 
-WardenDeck is a prototype. The database itself is not encrypted; audit and session data rely on filesystem permissions. Do not expose port `8787` to the public internet.
+WardenDeck is a prototype. The database is not encrypted; do not expose port `8787` to the internet.
 
 ---
 
@@ -242,7 +169,7 @@ WardenDeck is a prototype. The database itself is not encrypted; audit and sessi
 | `/remember <text>` | Save a memory (private chat → user scope, group → chat scope) |
 | `/memory` | List visible long-term memories |
 | `/forget <id>` | Delete a memory in the current scope |
-| `AW_ATTACH: /path/image.png` | In a final answer, send a local image through the bot |
+| `AW_ATTACH: /path/image.png` | In a final answer, send a local image |
 
 Per-message limits: 10 minutes without output, 30 minutes wall clock, 100 tool calls.
 
@@ -313,7 +240,7 @@ All commands accept `--dir`, defaulting to `~/.wardendeck` or `$WARDENDECK_DIR`.
 | `WARDENDECK_SANDBOX=0` | Disable the macOS sandbox (not recommended) |
 | `WARDENDECK_CLAUDE_AUTO_MEMORY=1` | Re-enable Claude Code's built-in auto memory (off by default to avoid leaking facts across bots) |
 
-Permission modes: `default` (ask for every tool), `acceptEdits`, `plan`, `dontAsk`, `auto`, `bypassPermissions` (dangerous).
+Permission modes: `default`, `acceptEdits`, `plan`, `dontAsk`, `auto`, `bypassPermissions` (dangerous).
 
 ---
 
@@ -322,11 +249,11 @@ Permission modes: `default` (ask for every tool), `acceptEdits`, `plan`, `dontAs
 <details>
 <summary>The bot does not reply</summary>
 
-1. `wardendeck status` — is the binding there?
-2. Is `wardendeck serve` running?
+1. Is `wardendeck serve` running?
+2. `wardendeck status` — is the binding there?
 3. In the Feishu console: long connection enabled, `im.message.receive_v1` subscribed, app published.
 4. `wardendeck audit list` — look for `message.inbound`:
-   - absent → the event never reached WardenDeck; check the event subscription;
+   - absent → the event never arrived; check the event subscription;
    - present → check `allowed_users` against the sender's `open_id`.
 
 </details>
@@ -334,9 +261,9 @@ Permission modes: `default` (ask for every tool), `acceptEdits`, `plan`, `dontAs
 <details>
 <summary>It replies in private chat but not in a group</summary>
 
-- The bot only answers when **this bot** is @-mentioned, not when another bot is mentioned.
+- The bot only answers when **this bot** is @-mentioned.
 - Verify the group `chat_id` with `wardendeck feishu chats`.
-- Make sure the binding uses the `oc_...` group ID, not your personal `ou_...` ID.
+- Use the `oc_...` group ID, not your personal `ou_...` ID.
 
 </details>
 
@@ -365,9 +292,9 @@ A `secrets` failure usually means the database and `master.key` do not belong to
 
 - **Claude Code is the only execution adapter.** Codex is detected but not wired up.
 - **Slack and Telegram** support credential tests and bindings, but not message ingestion yet.
-- **macOS-only kernel sandbox.** On Linux, run the service under a dedicated user or container.
+- **macOS-only kernel sandbox.** On Linux, run under a dedicated user or container.
 - **Native sessions are not shared across agents**; only semantic memory is.
-- **Models are optional configuration.** Claude Code uses its own configured model by default.
+- **Models are optional.** Claude Code uses its own configured model by default.
 - **Sleep means offline.** Use `caffeinate`, an always-on host, or a server.
 
 ---
@@ -393,7 +320,7 @@ npm run dev       # build and start the CLI
 
 ## Contributing
 
-Issues and pull requests are welcome. For larger changes, open an issue first so the design can be discussed. Please keep the prototype honest: if a capability is partial, document it as partial.
+Issues and pull requests are welcome. For larger changes, open an issue first. Keep the prototype honest: if a capability is partial, document it as partial.
 
 ---
 
