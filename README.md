@@ -119,7 +119,11 @@ Message the bot in Feishu:
 
 > 你好，看一下这个目录里有什么
 
-An execution card appears under your message, updates in place with tool progress, pauses for approval, and turns green when done.
+An execution card appears under your message, updates in place with tool progress, pauses for approval, and turns green when done:
+
+<p align="center">
+  <img src="docs/images/feishu-demo.jpg" alt="Feishu chat showing a WardenDeck execution card: a task, Bash tool calls, and the final answer" width="380" />
+</p>
 
 - Reply `1` allow once · `2` allow 30 minutes · `3` deny
 - Send `/stop` to cancel the current task
